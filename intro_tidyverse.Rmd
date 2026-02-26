@@ -1,0 +1,418 @@
+---
+title: "Introduction to the Tidyverse"
+author: "Kelsey Keith"
+date: "4/5/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(magrittr)
+library(conflicted)
+
+filter <- dplyr::filter
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Import with `readr()`
+
+The first step is to get our data into R! The tidyverse has a package `readr` for reading and writing files; to read files in you use the `read_*()` set of functions. To select the appropriate function, you need to know what your plain text file is delimited by, what character is used to separate the data. Then you can select the appropriate one of the three functions below:
+
+- `read_delim()` = can read in any plain text file if you supply the delimiter
+  - `read_csv()` = reads in plain text files separated by commas (csv = comma separated value)
+  - `read_tsv()` = reads in plain text files separated by tabs, written as "\t" in plain text (tsv = tab separated value)
+  
+To demonstrate, we'll read in the table we're using for this webinar `iris_untidy`
+  
+```{r}
+read_delim('iris_untidy.csv', delim = ',') -> iris_untidy
+
+# You get the same result if you read the table in with read_csv()
+read_csv('iris_untidy.csv') -> iris_untidy2
+```
+
+<br>
+
+## The pipe `%>%`
+
+One of the key ideas/principles of the tidyverse is the pipe `%>%`. The pipe takes the output of one function and gives it to the next function, allowing you to carry out separate operations in a fluid and readable manner. See the example below. We'll use the pipe through the webinar.
+
+```{r}
+read_delim('iris_untidy.csv', delim = ',') %>%
+  mutate(pipe_test = "Look, we can add a column!") %>%
+  select(Species, pipe_test, everything())
+```
+
+<br>
+
+## Tidy Messy Data with `tidyr()`
+
+Data seldom follows tidy data principles, so the tidyverse development team created the `tidyr` package. (You can read more about it at its website <https://tidyr.tidyverse.org/>.) If you look at the table we read into R by running it in the chunk below, you can see that there are two ways it isn't tidy. First, each sample is it's own column and since "sample" is am individual variable that violates the tidy principle that each variable is a column. Second, each cell is a collection of four separate values separated by underscores `_`, which violates the tidy principle that cell should be a single value. We'll use `tidyr` functions to fix this.
+
+```{r}
+iris_untidy
+```
+
+### `pivot_longer()` and `pivot_wider()`
+
+Right now the data are wide - there are more rows than columns. In order to tidy the data we need to make it skinny or long with columns for each individual variable. The `tidyr` functions `pivot_longer()` and `pivot_wider()` make data longer and wider respectively. So we'll use `pivot_longer()` to start tidying our data.
+
+```{r}
+iris_untidy %>%
+### pivot_longer() takes 3 arguments, the columns to want to collect, and the 
+### names of the 2 new columns you want to make. The code collects the columns 
+### s1 to s50 and puts the names s1 to s50 in the new column 'sample' and puts
+### the values that were in those columns in the new column 'data'.
+  pivot_longer(s1:s50, names_to = 'sample', values_to = 'data') -> iris_tidier
+
+### For an example of the opposite verb / function, here we use pivot_wider()
+### to untidy the data and make the table wider. pivot_wider() takes only 2
+### arguments, the name of the column you want to make the new column names 
+### from and the name of the column to want to populate the values in the new
+### columns from
+iris_tidier %>%
+  pivot_wider(names_from = Species, values_from = data)
+```
+
+### `separate()` and `unite()`
+
+Very often multiple values are present in a cell instead of single individual values. The `tidyr` package has the function `separate()` to, well, separate the values. As discussed previously, the data column has four separate measurements in it in centimeters (cm): sepal length, sepal width, petal length, and petal width 
+
+```{r}
+iris_tidier %>%
+### The separate column takes, at a minimum, 2 arguments. What column to 
+### separate and the names of the new columns to make from it. separate() will
+### try to guess what to split on, but I find it's best to specify for later
+### readability of the code. Also if there are multiple possible delimiters, 
+### like _, -, and/or :, separate will separate on them all probably 
+### incorrectly. Another handy argument in separate is convert = T. The column
+### types might not be the same after separating, like here where we're going 
+### to several numeric columns from a character column. If you don't have 
+### convert = T, on the new columns will still be encoded as characters even 
+### though they only have numbers in them, but with convert = T, separate will
+### check the contents of the column and change the encoding to the appropriate
+### type like numeric, interger, date, etc/
+  separate(data, 
+           into = c('sepal_length', 'sepal_width', 
+                    'petal_length', 'petal_width'),
+           sep = '_',
+           convert = T) -> iris_tidy
+
+### Sometimes, however, we will want to put columns together. For example, 
+### maybe I want to combine the species and the sample columns so I know in one
+### value what the species of the sample is. To do that, you use the opposite
+### verb / function of separate(), unite()
+iris_tidy %>%
+### unite takes 2 arguments minimum, the name of the new column and the names 
+### of the columns you want to join (it can as many as you want). By default,
+### it will use a _ as the separator, but I supplied it here for readability.
+  unite(sample_id, 
+        c('Species', 'sample'),
+        sep = '_')
+```
+
+### Exercises
+
+Thanks Trang Le for sharing your solution!
+
+Starting from the `iris_tidy` table, recreate the original table we read in, `iris_untidy`
+
+```{r}
+iris_tidy %>% 
+  unite(my_var, c('sepal_length', 'sepal_width', 'petal_length', 'petal_width'), sep = '_') %>% 
+  pivot_wider(names_from = sample, values_from = my_var)
+```
+
+## Wrangle
+
+Data, in addition to not being tidy, is also usually not in the format you want it to be. That's where the `dplyr` package comes in for data wrangling, aka organizing your data into the form you want it in (You can read more about the package at its website <https://dplyr.tidyverse.org/>).
+
+### `arrange()`
+
+The `arrange()` function allows you to sort the data by some criteria, usually another column in the data. 
+
+```{r}
+### Before arranging the data, let's remember what it looks like
+iris_tidy
+
+### arrange() takes, at a minimum, a single column as an argument. It will sort
+### the table by that column in order from least to greatest
+iris_tidy %>%
+  arrange(petal_width)
+
+### You can sort the data by as many columns as you like, although the changes
+### in the order are smaller with each additional column
+iris_tidy %>%
+  arrange(petal_width, petal_length, sepal_length)
+
+### What if you want to sort from largest to smallest? You can use the helper
+### function desc() that changes the sort order from largest to smallest.
+iris_tidy %>%
+  arrange(desc(petal_width))
+```
+
+### `select()`
+
+The `select()` function allows you to pick only the columns you want
+
+```{r}
+### For the select() function, you just give it the names of the columns you 
+### want. For more complicated selection criteria, you probably need to use 
+### select_if() or select_at() which are beyond the scope of this presentation.
+iris_tidy %>%
+  select(Species, sepal_length, sepal_width)
+
+iris_tidy %>%
+  select(Species:sepal_width) -> select_example
+
+iris_tidy %>%
+  select(species = Species, sepal_length, sepal_width)
+```
+
+### `filter()`
+
+The function `filter()` allows you select a subset of the data according to some criteria. This could be by matching a variable like `sample == 's42'` or could be base on some numberic value like `sepal_width < 3 | sepal_width > 4`
+
+```{r}
+### filter takes that name of the column you want to filter on and some 
+### logical condition. Here, we'll get only the rows of the table for samples
+### with sepal_lengths greater than 4.5 cms.
+iris_tidy %>%
+  filter(sepal_length > 5.5, Species == 'setosa')
+
+iris_tidy %>%
+  filter(sepal_length > 5.5 | Species == 'setosa')
+
+### You can filter by as many things as you want
+iris_tidy %>%
+  filter(sepal_length > 4.5, Species %in% c('virginica', 'versicolor'), 
+         sepal_width < 3, petal_length > 5, petal_width > 1.5)
+```
+
+### `mutate()`
+
+The function `mutate()` adds an additional column onto the table.
+
+```{r}
+iris_tidy %>%
+### mutate() needs the name of the new column equal to whatever will go in the
+### new column. Frequently that will be a logical statement based on other
+### data in the table, like in this example where we call any iris with a sepal
+### length less than 5.8 cm small and all the other irises large
+  mutate(flower_size = ifelse(sepal_length < 5.8, 'small', 'large'))
+
+### You can make more than one column in the same mutate call. If you supply a
+### single value, it will be used for all rows (recycled).
+iris_tidy %>%
+  mutate(flower_size = ifelse(sepal_length < 5.8, 'small', 'large'),
+         second_column = 'tidyverse_webinar')
+
+iris_tidy %>%
+  mutate(flower_size = case_when(sepal_length < 3 ~ 'small',
+                                 sepal_length >= 3 & sepal_length < 6 ~ 'medium',
+                                 TRUE ~ 'large'))
+```
+
+### `summarize()`
+
+Lets you reduce the data down to some summary statistics or other summary function
+
+```{r}
+### summarize() works similarly to mutate(), but instead of adding an 
+### additional column with an entry for all rows, it will reduce to the number
+### summaries you asked for. Like mutate(), summarize() needs the name of the
+### summary column equal to the calculation you're making. Here, we'll make the
+### summary column "average" which is equal to the mean of the petal lengths
+iris_tidy %>%
+  summarize(average = mean(petal_length))
+
+### For most tidyverse functions, either the British or American spellings can
+### be used. Frequently the British spelling comes up by default because Hadley
+### Wickham is from New Zealand.
+iris_tidy %>%
+  summarise(average = mean(petal_length))
+
+### summarize() is very powerful when used with group_by(). group_by() causes 
+### all functions later in the pipeline to be applied over the specified group
+iris_tidy %>%
+  group_by(Species) %>%
+  summarize(average = mean(petal_length))
+
+### Don't forget to ungroup() because grouping will mess up your code later
+iris_tidy %>%
+  group_by(Species) %>%
+  summarize(average = mean(petal_length)) %>%
+  ungroup()
+
+### You can calculate more than one summary at a time as long as they (for the
+### moment) have a single thing as their output
+iris_tidy %>%
+  group_by(Species) %>%
+  summarize(avg_pl = mean(petal_length),
+            avg_pw = mean(petal_width)) %>%
+  ungroup()
+```
+
+#### Exercises
+
+Thanks Tess Cherlin for sharing your solutions to these exercises!
+
+1. Filter the `iris_tidy` table for versicolor irises with a sepal width greater than 3 cm.
+
+```{r}
+iris_tidy %>% filter(sepal_length > 3)
+```
+
+2. Add an additional column onto the `iris_tidy` table
+
+```{r}
+iris_tidy %>%
+  filter(sepal_width) %>% 
+  mutate(new_column = "Kelsey_is_so_tidy")
+```
+
+3. Find the median of the sepal lengths and sepal widths for all three species of irises using the `iris_tidy` table.
+
+```{r}
+iris_tidy %>% 
+  group_by(Species) %>% 
+  mutate(median_sl = median(sepal_length),
+         median_sw = median(sepal_width))
+```
+
+<br>
+
+## Visualize
+
+Arguably the most important part of data analysis is visualization. The `ggplot2` package, the first tidyverse package written, is  (You can read more about the `ggplot2` package at its website <https://ggplot2.tidyverse.org/>)
+
+To use `ggplot2`, you supply the data and an aesthetic mapping (what data you want to plot) to the `ggplot()` function and then add additional layers shaping how the data is plotted. For a look at all of the different plots you can make with `ggplot2` the R Graph Gallery is an excellent resource <https://www.r-graph-gallery.com/>.
+
+### Density Plot with `geom_density()`
+
+A density plot shows the distribution of a numeric variable. It's a smoothed version of a histogram.
+
+```{r}
+### In ggplot() you give the data table, iris_tidy, and then the aesthetics or
+### what columns you want to plot inside aes() and the shape you want to plot
+### aka the geom
+# Supply the table and the data you want to plot from it
+ggplot(iris_tidy, aes(x = petal_width)) +
+# Shape the output into a density plot with geom_density(). You need to supply
+# at least 1 geom.
+  geom_density()
+
+### You can add additional aesthetics like filling the density plots with color
+### by supplying a fill = '' inside an aesthetic. You can put the aes() either 
+### inside ggplot() or inside a particular geom like with geom_density() here
+ggplot(iris_tidy, aes(x = petal_width)) +
+  geom_density(aes(fill = Species))
+
+### It's hard to see the distribution of the data where the plots overlap now,
+### so you can control the transparency of the fill using the parameter alpha = 
+### (number between 0 and 1). Notice that alpha is NOT placed inside aes()
+### because we want it to apply universally to all three of the distributions. 
+### If you place it inside aes() you would need to supply a column for it to be
+### applied over and it would vary by that variable. (Alpha is not a good 
+### aesthetic to visualize different variables.)
+ggplot(iris_tidy, aes(x = petal_width)) +
+  geom_density(aes(fill = Species), alpha = 0.75)
+```
+
+### Box Plot with `geom_boxplot()`
+
+A boxplot also shows the distribution of the data, but rather than showing the overall shape, pictures the minimum value, first quartile, median, third quartile, and maximum value along with any outliers. You can see that we're plotting the same data as with `geom_density()` but visualzing it in a different way.
+
+```{r}
+### geom_boxplot() needs a categorical x variable and a numeric y variable; 
+### notice that other than the addition of an extra variable the code is the 
+### same as for geom_density()
+ggplot(iris_tidy, aes(x = Species, y = petal_width)) +
+  geom_boxplot(aes(fill = Species), alpha = 0.75)
+
+### You can change the entire look of the plot by adding a different theme
+# theme_classic()
+ggplot(iris_tidy, aes(x = Species, y = petal_width)) +
+  geom_boxplot(aes(fill = Species), alpha = 0.75) +
+  theme_classic()
+
+# theme_minimal()
+ggplot(iris_tidy, aes(x = Species, y = petal_width)) +
+  geom_boxplot(aes(fill = Species), alpha = 0.75) +
+  theme_minimal()
+```
+
+### Scatter Plot with `geom_point()`
+
+A scatter plot shows the intersection of two numeric variables with a point. From `ggplot2`, `geom_point()` is used to plot a scatter plot.
+
+```{r}
+### geom_point() needs numeric x and y variables, but otherwise same code
+ggplot(iris_tidy, aes(x = petal_width, y = petal_length)) +
+# aesthetic for points is color instead of fill
+  geom_point(aes(color = Species), alpha = 0.75) +
+  theme_classic()
+
+### You can build on your code by adding additional aesthetics. Here we'll use
+### geom_smooth() to fit a line through the points in addition to plotting them
+ggplot(iris_tidy, aes(x = petal_width, y = petal_length)) +
+  geom_point(aes(color = Species), alpha = 0.75) +
+# fits a line to your points
+  geom_smooth(method = 'lm', se = F) +
+  theme_classic()
+
+### aesthetics in the main ggplot() call propagate to all subsequent layers
+ggplot(iris_tidy, aes(x = petal_width, y = petal_length, color = Species)) +
+  geom_point(alpha = 0.75) +
+  geom_smooth(method = 'lm', se = F) +
+  theme_classic()
+```
+
+**Side note from the chat:** the `cowplot` and `patchwork` packages are for plotting multiple ggplots together
+
+```{r}
+cowplot::plot_grid(p1, p2)
+
+library(patchwork)
+p1 / p2
+```
+
+#### Exercises
+
+1. Dress up the plot! Make 2-3 changes to the fixed aesthetics, like alpha, in the plot code below. Some suggestions
+
+- alpha: Change the transparency 
+- color: Make the points or the line a different color! A pdf of R color names is available at the link <http://www.stat.columbia.edu/~tzheng/files/Rcolor.pdf>
+- fill: Play around with it using the same color names as at the pdf link above.
+- linetype: You don't have to have just a boring straight line! You could set it to 'dashed' or one of the other options here <https://lh3.googleusercontent.com/proxy/_6lxyjg7sIfyHLmwOZix0oVpg25P_ye_8MI4N6S8uPsAAoxLi8biCNNhGkRNpEJ6vDQxiOvAljZCjJkYb1dQ0jP7LTy2jtlobADcgfzGTqeUYNaOH4CQFteIlZ2fz1oz>
+- shape: You can also change the shape of the points from circles. Options here <https://ggplot2.tidyverse.org/articles/ggplot2-specs_files/figure-html/unnamed-chunk-8-1.png>
+- size: Change the size of something! Accepts numeric values
+
+Thanks to Danielle Brantley for sharing her solution!
+
+```{r}
+ggplot(iris_tidy, aes(x = petal_width, y = petal_length)) +
+  geom_point(aes(color = Species), alpha = 0.75, shape = "diamond plus") +
+  geom_smooth(method = 'lm', se = F, color = 'purple', linetype = 'dashed') +
+  theme_classic() -> p1
+```
+
+2. Try making a boxplot in the chunk below using `geom_boxplot()`. Now, using the same code, swap `geom_violin()` for `geom_boxplot()`. See how you can change the look of the data without changing the data being plotted? 
+
+```{r}
+ggplot(iris_tidy, aes(x = Species, y = petal_width)) +
+  geom_boxplot(outlier.shape = NA) +
+  ggbeeswarm::geom_beeswarm() +
+  theme_classic() -> p2
+```
+
+3. Make your own plot from iris_tidy, different from any of the examples! You can switch up what variables are plotted or what geoms are plotted or both!
+
+```{r}
+
+```
+
+
+
