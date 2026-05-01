@@ -1,16 +1,12 @@
 ---
 title: "Introduction to the Tidyverse"
 author: "Kelsey Keith"
-date: "4/5/2020"
+date: "2026-04-29"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
 library(tidyverse)
-library(magrittr)
-library(conflicted)
-
-filter <- dplyr::filter
 
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -33,16 +29,32 @@ read_delim('iris_untidy.csv', delim = ',') -> iris_untidy
 read_csv('iris_untidy.csv') -> iris_untidy2
 ```
 
-<br>
-
-## The pipe `%>%`
-
-One of the key ideas/principles of the tidyverse is the pipe `%>%`. The pipe takes the output of one function and gives it to the next function, allowing you to carry out separate operations in a fluid and readable manner. See the example below. We'll use the pipe through the webinar.
+The most helpful thing to do first is to look at your data!
 
 ```{r}
-read_delim('iris_untidy.csv', delim = ',') %>%
-  mutate(pipe_test = "Look, we can add a column!") %>%
+# you can run the object you read in and see an interactive table
+iris_untidy
+
+# glimpse() gives you a summary of what's in your data
+glimpse(iris_untidy)
+```
+
+Our tables have "untidy" in them and this workshop is called "Introduction to the Tidyverse", so what do we mean by tidy/untidy/tidyverse? Let's look at the tidyverse definitions, <https://tidyr.tidyverse.org/articles/tidy-data.html>
+
+<br>
+
+## The pipe `|>`
+
+One of the key ideas/principles of the tidyverse is the pipe, orginally `|>`. It got so popular that piping was added to base R as `|>` The pipe takes the output of one function and gives it to the next function, allowing you to carry out separate operations in a fluid and readable manner. See the example below. We'll use the pipe through the webinar.
+
+```{r}
+read_delim('iris_untidy.csv', delim = ',') |>
+  mutate(pipe_test = "Look, we can add a column!") |>
   select(Species, pipe_test, everything())
+
+select(mutate(read_delim('iris_untidy.csv', delim = ','), 
+              pipe_test = "Look, we can add a column!"),
+       Species, pipe_test, everything())
 ```
 
 <br>
@@ -60,7 +72,7 @@ iris_untidy
 Right now the data are wide - there are more rows than columns. In order to tidy the data we need to make it skinny or long with columns for each individual variable. The `tidyr` functions `pivot_longer()` and `pivot_wider()` make data longer and wider respectively. So we'll use `pivot_longer()` to start tidying our data.
 
 ```{r}
-iris_untidy %>%
+iris_untidy |>
 ### pivot_longer() takes 3 arguments, the columns to want to collect, and the 
 ### names of the 2 new columns you want to make. The code collects the columns 
 ### s1 to s50 and puts the names s1 to s50 in the new column 'sample' and puts
@@ -72,39 +84,39 @@ iris_untidy %>%
 ### arguments, the name of the column you want to make the new column names 
 ### from and the name of the column to want to populate the values in the new
 ### columns from
-iris_tidier %>%
+iris_tidier |>
   pivot_wider(names_from = Species, values_from = data)
 ```
 
-### `separate()` and `unite()`
+### `separate_*()` and `unite()`
 
-Very often multiple values are present in a cell instead of single individual values. The `tidyr` package has the function `separate()` to, well, separate the values. As discussed previously, the data column has four separate measurements in it in centimeters (cm): sepal length, sepal width, petal length, and petal width 
+Very often multiple values are present in a cell instead of single individual values. The `tidyr` package has the several `separate_*()` functions, to, well, separate the values. As discussed previously, the data column has four separate measurements in it in centimeters (cm): sepal length, sepal width, petal length, and petal width 
 
 ```{r}
-iris_tidier %>%
-### The separate column takes, at a minimum, 2 arguments. What column to 
-### separate and the names of the new columns to make from it. separate() will
-### try to guess what to split on, but I find it's best to specify for later
-### readability of the code. Also if there are multiple possible delimiters, 
-### like _, -, and/or :, separate will separate on them all probably 
-### incorrectly. Another handy argument in separate is convert = T. The column
-### types might not be the same after separating, like here where we're going 
-### to several numeric columns from a character column. If you don't have 
-### convert = T, on the new columns will still be encoded as characters even 
-### though they only have numbers in them, but with convert = T, separate will
-### check the contents of the column and change the encoding to the appropriate
-### type like numeric, interger, date, etc/
-  separate(data, 
-           into = c('sepal_length', 'sepal_width', 
-                    'petal_length', 'petal_width'),
-           sep = '_',
-           convert = T) -> iris_tidy
+iris_tidier |>
+### To separate, you need to specify three things,(1) the single column to 
+### separate, (2) what to separate on, and (3) what the new column names will be.W
+### separate and the names of the new columns to make from it. 
+### separate_wider_delim() separates on a single character like ',', '-', '_', etc.
+### separate_wider_position() separates on a position in the column like 1 or 5
+### separate_wider_regex() allows you to specify a regular expression (regex) to split 
+### on but that is beyond the scope of this workshop!
+  separate_wider_delim(data, 
+                       delim = '_',
+                       names = c('sepal_length', 'sepal_width', 
+                                 'petal_length', 'petal_width')) |>
+  mutate(petal_length = as.numeric(petal_length),
+         sepal_length = as.numeric(sepal_length),
+         petal_width = as.numeric(petal_width),
+         sepal_width = as.numeric(sepal_width)) -> iris_tidy
+
+
 
 ### Sometimes, however, we will want to put columns together. For example, 
 ### maybe I want to combine the species and the sample columns so I know in one
 ### value what the species of the sample is. To do that, you use the opposite
 ### verb / function of separate(), unite()
-iris_tidy %>%
+iris_tidy |>
 ### unite takes 2 arguments minimum, the name of the new column and the names 
 ### of the columns you want to join (it can as many as you want). By default,
 ### it will use a _ as the separator, but I supplied it here for readability.
@@ -115,14 +127,14 @@ iris_tidy %>%
 
 ### Exercises
 
-Thanks Trang Le for sharing your solution!
-
 Starting from the `iris_tidy` table, recreate the original table we read in, `iris_untidy`
 
 ```{r}
-iris_tidy %>% 
-  unite(my_var, c('sepal_length', 'sepal_width', 'petal_length', 'petal_width'), sep = '_') %>% 
-  pivot_wider(names_from = sample, values_from = my_var)
+iris_tidy %>%
+  unite(data, c(sepal_length, sepal_width, petal_length, petal_width), sep = '_') %>%
+  pivot_wider(names_from = sample, values_from = data)
+
+iris_untidy
 ```
 
 ## Wrangle
@@ -139,17 +151,17 @@ iris_tidy
 
 ### arrange() takes, at a minimum, a single column as an argument. It will sort
 ### the table by that column in order from least to greatest
-iris_tidy %>%
+iris_tidy |>
   arrange(petal_width)
 
 ### You can sort the data by as many columns as you like, although the changes
 ### in the order are smaller with each additional column
-iris_tidy %>%
+iris_tidy |>
   arrange(petal_width, petal_length, sepal_length)
 
 ### What if you want to sort from largest to smallest? You can use the helper
 ### function desc() that changes the sort order from largest to smallest.
-iris_tidy %>%
+iris_tidy |>
   arrange(desc(petal_width))
 ```
 
@@ -161,13 +173,13 @@ The `select()` function allows you to pick only the columns you want
 ### For the select() function, you just give it the names of the columns you 
 ### want. For more complicated selection criteria, you probably need to use 
 ### select_if() or select_at() which are beyond the scope of this presentation.
-iris_tidy %>%
+iris_tidy |>
   select(Species, sepal_length, sepal_width)
 
-iris_tidy %>%
+iris_tidy |>
   select(Species:sepal_width) -> select_example
 
-iris_tidy %>%
+iris_tidy |>
   select(species = Species, sepal_length, sepal_width)
 ```
 
@@ -179,14 +191,14 @@ The function `filter()` allows you select a subset of the data according to some
 ### filter takes that name of the column you want to filter on and some 
 ### logical condition. Here, we'll get only the rows of the table for samples
 ### with sepal_lengths greater than 4.5 cms.
-iris_tidy %>%
+iris_tidy |>
   filter(sepal_length > 5.5, Species == 'setosa')
 
-iris_tidy %>%
+iris_tidy |>
   filter(sepal_length > 5.5 | Species == 'setosa')
 
 ### You can filter by as many things as you want
-iris_tidy %>%
+iris_tidy |>
   filter(sepal_length > 4.5, Species %in% c('virginica', 'versicolor'), 
          sepal_width < 3, petal_length > 5, petal_width > 1.5)
 ```
@@ -196,23 +208,24 @@ iris_tidy %>%
 The function `mutate()` adds an additional column onto the table.
 
 ```{r}
-iris_tidy %>%
+iris_tidy |>
 ### mutate() needs the name of the new column equal to whatever will go in the
 ### new column. Frequently that will be a logical statement based on other
 ### data in the table, like in this example where we call any iris with a sepal
 ### length less than 5.8 cm small and all the other irises large
-  mutate(flower_size = ifelse(sepal_length < 5.8, 'small', 'large'))
+  mutate(flower_size = case_when(sepal_length < 5.8 ~ 'small', 
+                                 .default = 'large')) |> arrange(flower_size)
 
 ### You can make more than one column in the same mutate call. If you supply a
 ### single value, it will be used for all rows (recycled).
-iris_tidy %>%
-  mutate(flower_size = ifelse(sepal_length < 5.8, 'small', 'large'),
-         second_column = 'tidyverse_webinar')
+iris_tidy |>
+  mutate(flower_size = case_when(sepal_length < 5.8 ~ 'small'),
+         second_column = 'tidyverse_webinar') |> arrange(desc(sepal_length))
 
-iris_tidy %>%
+iris_tidy |>
   mutate(flower_size = case_when(sepal_length < 3 ~ 'small',
                                  sepal_length >= 3 & sepal_length < 6 ~ 'medium',
-                                 TRUE ~ 'large'))
+                                 .default = 'large'))
 ```
 
 ### `summarize()`
@@ -225,61 +238,50 @@ Lets you reduce the data down to some summary statistics or other summary functi
 ### summaries you asked for. Like mutate(), summarize() needs the name of the
 ### summary column equal to the calculation you're making. Here, we'll make the
 ### summary column "average" which is equal to the mean of the petal lengths
-iris_tidy %>%
+iris_tidy |>
+  mutate(petal_length = as.numeric(petal_length)) |>
   summarize(average = mean(petal_length))
 
 ### For most tidyverse functions, either the British or American spellings can
 ### be used. Frequently the British spelling comes up by default because Hadley
 ### Wickham is from New Zealand.
-iris_tidy %>%
+iris_tidy |>
   summarise(average = mean(petal_length))
 
-### summarize() is very powerful when used with group_by(). group_by() causes 
+### summarize() is very powerful when used with .by. .by causes 
 ### all functions later in the pipeline to be applied over the specified group
-iris_tidy %>%
-  group_by(Species) %>%
-  summarize(average = mean(petal_length))
-
-### Don't forget to ungroup() because grouping will mess up your code later
-iris_tidy %>%
-  group_by(Species) %>%
-  summarize(average = mean(petal_length)) %>%
-  ungroup()
+iris_tidy |>
+  summarize(average = mean(petal_length), .by = Species)
 
 ### You can calculate more than one summary at a time as long as they (for the
 ### moment) have a single thing as their output
-iris_tidy %>%
-  group_by(Species) %>%
+### You may also see group_by() and ungroup(), which were used before .by 
+### was added
+iris_tidy |>
+  group_by(Species) |>
   summarize(avg_pl = mean(petal_length),
-            avg_pw = mean(petal_width)) %>%
+            avg_pw = mean(petal_width)) |>
   ungroup()
 ```
 
 #### Exercises
 
-Thanks Tess Cherlin for sharing your solutions to these exercises!
-
 1. Filter the `iris_tidy` table for versicolor irises with a sepal width greater than 3 cm.
 
 ```{r}
-iris_tidy %>% filter(sepal_length > 3)
+
 ```
 
 2. Add an additional column onto the `iris_tidy` table
 
 ```{r}
-iris_tidy %>%
-  filter(sepal_width) %>% 
-  mutate(new_column = "Kelsey_is_so_tidy")
+
 ```
 
 3. Find the median of the sepal lengths and sepal widths for all three species of irises using the `iris_tidy` table.
 
 ```{r}
-iris_tidy %>% 
-  group_by(Species) %>% 
-  mutate(median_sl = median(sepal_length),
-         median_sw = median(sepal_width))
+
 ```
 
 <br>
@@ -370,15 +372,6 @@ ggplot(iris_tidy, aes(x = petal_width, y = petal_length, color = Species)) +
   theme_classic()
 ```
 
-**Side note from the chat:** the `cowplot` and `patchwork` packages are for plotting multiple ggplots together
-
-```{r}
-cowplot::plot_grid(p1, p2)
-
-library(patchwork)
-p1 / p2
-```
-
 #### Exercises
 
 1. Dress up the plot! Make 2-3 changes to the fixed aesthetics, like alpha, in the plot code below. Some suggestions
@@ -390,22 +383,16 @@ p1 / p2
 - shape: You can also change the shape of the points from circles. Options here <https://ggplot2.tidyverse.org/articles/ggplot2-specs_files/figure-html/unnamed-chunk-8-1.png>
 - size: Change the size of something! Accepts numeric values
 
-Thanks to Danielle Brantley for sharing her solution!
+
 
 ```{r}
-ggplot(iris_tidy, aes(x = petal_width, y = petal_length)) +
-  geom_point(aes(color = Species), alpha = 0.75, shape = "diamond plus") +
-  geom_smooth(method = 'lm', se = F, color = 'purple', linetype = 'dashed') +
-  theme_classic() -> p1
+
 ```
 
 2. Try making a boxplot in the chunk below using `geom_boxplot()`. Now, using the same code, swap `geom_violin()` for `geom_boxplot()`. See how you can change the look of the data without changing the data being plotted? 
 
 ```{r}
-ggplot(iris_tidy, aes(x = Species, y = petal_width)) +
-  geom_boxplot(outlier.shape = NA) +
-  ggbeeswarm::geom_beeswarm() +
-  theme_classic() -> p2
+
 ```
 
 3. Make your own plot from iris_tidy, different from any of the examples! You can switch up what variables are plotted or what geoms are plotted or both!
